@@ -31,8 +31,8 @@ struct TiffImage {
 
     uint32_t compression = 0;
 
-    uint32_t strip_offset = 0;
-    uint32_t strip_byte_count = 0;
+    std::vector<uint32_t> strip_offsets;
+    std::vector<uint32_t> strip_byte_counts;
 
     uint16_t bits_per_sample = 1;
     uint16_t samples_per_pixel = 1;
@@ -148,15 +148,6 @@ static inline uint32_t read_u32_le(const uint8_t* data, size_t size, uint32_t of
          | (uint32_t)data[offset + 3] << 24;
 }
 
-static inline uint32_t read_array_value(
-    const uint8_t* data,
-    size_t size,
-    uint32_t base_offset,
-    uint32_t index
-) {
-    return read_u32_le(data, size, base_offset + index * 4);
-}
-
 class TiffParser {
 public:
     static TiffImage parse(const uint8_t* data, size_t size) {
@@ -209,10 +200,11 @@ public:
         bool has_strip_offset = false;
         bool has_strip_count = false;
 
-        uint32_t strip_offset_count = 0;
-        uint32_t strip_byte_count_count = 0;
-        uint32_t strip_offsets_value_or_offset = 0;
-        uint32_t strip_byte_counts_value_or_offset = 0;
+        uint32_t strip_offsets_count = 0;
+        uint32_t strip_offsets_vo = 0;
+
+        uint32_t strip_byte_counts_count = 0;
+        uint32_t strip_byte_counts_vo = 0;
 
         for (int i = 0; i < entry_count; i++) {
             uint16_t tag = r.read<uint16_t>();
@@ -248,14 +240,14 @@ public:
                     break;
 
                 case STRIP_OFFSETS:
-                    strip_offset_count = count;
-                    strip_offsets_value_or_offset = value_or_offset;
+                    strip_offsets_count = count;
+                    strip_offsets_vo = value_or_offset;
                     has_strip_offset = true;
                     break;
 
                 case STRIP_BYTE_COUNTS:
-                    strip_byte_count_count = count;
-                    strip_byte_counts_value_or_offset = value_or_offset;
+                    strip_byte_counts_count = count;
+                    strip_byte_counts_vo = value_or_offset;
                     has_strip_count = true;
                     break;
 
@@ -287,33 +279,60 @@ public:
             throw std::runtime_error("Unsupported compression");
         }
 
-        if (strip_offset_count != strip_byte_count_count) {
+        if (strip_offsets_count == 0 || strip_byte_counts_count == 0) {
+            throw std::runtime_error("Missing strip data");
+        }
+
+        if (strip_offsets_count != strip_byte_counts_count) {
             throw std::runtime_error("Mismatched strip arrays");
         }
 
-        img.strip_offset = read_array_value(
-            data,
-            size,
-            strip_offsets_value_or_offset,
-            0
-        );
-
-        img.strip_byte_count = read_array_value(
-            data,
-            size,
-            strip_byte_counts_value_or_offset,
-            0
-        );
-
-        // -----------------------------
-        // 5. STRICT SINGLE-STRIP RULE
-        // -----------------------------
-        if (img.strip_offset == 0 || img.strip_byte_count == 0) {
-            throw std::runtime_error("Invalid strip");
+        if (strip_offsets_count != strip_byte_counts_count) {
+            throw std::runtime_error("Mismatched strip arrays");
         }
 
-        if (img.strip_offset + img.strip_byte_count > size) {
-            throw std::runtime_error("Strip out of bounds");
+        auto read_array = [&](
+            uint32_t count,
+            uint32_t value_or_offset
+        ) {
+            std::vector<uint32_t> out;
+
+            if (count == 1) {
+                // inline value
+                out.push_back(value_or_offset);
+                return out;
+            }
+
+            // array stored at offset
+            for (uint32_t i = 0; i < count; i++) {
+                uint32_t v = read_u32_le(data, size, value_or_offset + i * 4);
+                out.push_back(v);
+            }
+
+            return out;
+        };
+
+        img.strip_offsets = read_array(
+            strip_offsets_count,
+            strip_offsets_vo
+        );
+
+        img.strip_byte_counts = read_array(
+            strip_byte_counts_count,
+            strip_byte_counts_vo
+        );
+
+        for (size_t i = 0; i < img.strip_offsets.size(); i++) {
+            uint32_t off = img.strip_offsets[i];
+            uint32_t len = img.strip_byte_counts[i];
+
+            if (off == 0 || len == 0) {
+                throw std::runtime_error("Invalid strip entry");
+            }
+
+            if ((uint64_t)off + (uint64_t)len > size) {
+                throw std::runtime_error("Strip out of bounds");
+            }
         }
 
         return img;

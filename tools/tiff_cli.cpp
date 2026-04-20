@@ -31,8 +31,14 @@ static void print_image(const tiff_binary::TiffImage& img) {
     std::cout << "BitsPerSample: " << img.bits_per_sample << "\n";
     std::cout << "SamplesPerPixel: " << img.samples_per_pixel << "\n";
 
-    std::cout << "StripOffset: " << img.strip_offset << "\n";
-    std::cout << "StripByteCount: " << img.strip_byte_count << "\n";
+    std::cout << "Strips: " << img.strip_offsets.size() << "\n";
+
+    for (size_t i = 0; i < img.strip_offsets.size(); i++) {
+        std::cout << "  Strip " << i
+                << ": offset=" << img.strip_offsets[i]
+                << ", size=" << img.strip_byte_counts[i]
+                << "\n";
+    }
 }
 
 int main(int argc, char** argv) {

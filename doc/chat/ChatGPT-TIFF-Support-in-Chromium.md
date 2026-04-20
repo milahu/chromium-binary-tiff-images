@@ -2,8 +2,8 @@
 
 **User:** Milan Hauth (milahu@gmail.com)  
 **Created:** 2026/4/20 18:11:54  
-**Updated:** 2026/4/20 20:42:34  
-**Exported:** 2026/4/20 20:43:54  
+**Updated:** 2026/4/20 20:52:34  
+**Exported:** 2026/4/20 20:55:27  
 **Link:** [https://chatgpt.com/c/69e6501d-69e0-83eb-bc60-8a47f4cf08b9](https://chatgpt.com/c/69e6501d-69e0-83eb-bc60-8a47f4cf08b9)  
 
 ## Prompt:
@@ -2775,6 +2775,190 @@ I recommend next we build:
 *   safe incremental decoding
 
 This is the first step where you’ll actually see pixels decode correctly instead of just parsing metadata.
+
+## Prompt:
+ok, now i get
+
+$ ./build/tiff_cli test.tiff 
+TIFF parse error: Strip out of bounds
+
+tiffinfo test.tiff and magick identify -verbose test.tiff say nothing about a strip count, but apparently imagemagick produces multiple strips... so lets drop the "single-strip rule" and support multi-strip files from the start
+
+## Response:
+Good call — this is exactly the right moment to relax the “single strip” assumption. ImageMagick almost always produces **multi-strip TIFFs**, even when logically it’s a single image.
+
+The error:
+
+undefined
+
+is happening because your parser is still treating:
+
+undefined
+
+as **one contiguous block**, but in reality you now have:
+
+undefined
+
+Each strip is **independent**, not one big buffer.
+
+* * *
+
+🧠 What you need to change (conceptually)
+=========================================
+
+Instead of:
+
+undefined
+
+You need:
+
+undefined
+
+* * *
+
+🧩 Step-by-step upgrade
+=======================
+
+1\. Update your `TiffImage`
+---------------------------
+
+undefined
+
+* * *
+
+2\. Store raw IFD info (during parsing)
+---------------------------------------
+
+Inside your parser, keep:
+
+undefined
+
+* * *
+
+3\. Validate counts
+-------------------
+
+undefined
+
+* * *
+
+4\. Read arrays properly
+------------------------
+
+Add this helper (you already have something similar):
+
+undefined
+
+* * *
+
+### Inline vs offset handling (IMPORTANT)
+
+undefined
+
+_(This lambda is fine here because it's inside the function and captures correctly.)_
+
+* * *
+
+5\. Populate your image
+-----------------------
+
+undefined
+
+* * *
+
+6\. Validate each strip (THIS replaces your old check)
+------------------------------------------------------
+
+Remove this:
+
+undefined
+
+Replace with:
+
+undefined
+
+👉 Note the **uint64\_t cast** — this prevents overflow bugs.
+
+* * *
+
+🧠 Why your previous version failed
+===================================
+
+ImageMagick likely produced something like:
+
+undefined
+
+Your parser interpreted:
+
+undefined
+
+→ completely wrong → overflow → “out of bounds”
+
+* * *
+
+🧪 Update your CLI output
+=========================
+
+Update your CLI to show strips:
+
+undefined
+
+* * *
+
+🧭 What you gain from this change
+=================================
+
+### ✔ Works with ImageMagick output
+
+### ✔ Works with real-world TIFFs
+
+### ✔ Future-proof for JBIG2
+
+### ✔ Correct CCITT decoding (you’ll need all strips)
+
+* * *
+
+⚠️ Important upcoming complexity
+================================
+
+Now that you support multiple strips, decoding becomes:
+
+undefined
+
+You’ll need:
+
+*   `RowsPerStrip`
+*   correct row stitching
+
+* * *
+
+🚀 Next step (recommended)
+==========================
+
+Now that parsing is solid, the next logical piece is:
+
+👉 Build a `StripView` + iteration API
+--------------------------------------
+
+Something like:
+
+undefined
+
+and:
+
+undefined
+
+This becomes your decoder input layer.
+
+* * *
+
+If you want, I can help you next with:
+
+### 🧩 A clean multi-strip CCITT G4 decoding pipeline (including row stitching)
+
+or
+
+### 🧠 Proper handling of `RowsPerStrip` (critical for correct image reconstruction)
 
 
 
