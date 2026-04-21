@@ -6,7 +6,14 @@ Group4-compressed TIFF images for Chromium
 
 ## status
 
-concept
+early draft
+
+
+
+## todo
+
+- test multi-strip images
+- test too-large images
 
 
 
