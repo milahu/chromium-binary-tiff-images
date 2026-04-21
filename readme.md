@@ -159,10 +159,39 @@ https://www.fileformat.info/format/cals/egff.htm
 https://gist.github.com/el-hult/90f7495907f8edaa1783db23151e4e36  
 Code for converting a CALS raster file to TIFF. Using vanilla Python.
 
+https://github.com/OSGeo/gdal/blob/master/frmts/cals/calsdataset.cpp
+
 
 
 ### CIT (Intergraph Raster Type 24)
 
+no: closed-source
+
+https://www.leadtools.com/help/sdk/v21/dh/to/file-formats-intergraph.html
+
+> Intergraph is a monochrome bitmap format developed by Intergraph. LEADTOOLS supports the RLE and CIT versions of this file format.
+
+> The default extensions used by this format are: ITG and CIT.
+
+> For this file format, LEAD supports CCITT G4 and RLE compression.
+
+https://github.com/OSGeo/gdal-extra-drivers/blob/master/not_integrated_in_build/ingr/intergraphraster.rst
+
+> File Extension
+>
+> .g4	CCITT G4 1-bit data
+
+https://www.cadstudio.cz/en/citin.asp
+
+> CIT is a widely used format in the MicroStation community. CIT is a special case of Intergraph Raster File Format (INGR) - a 1-bit version with CCITT G4 compression).
+
+chatGPT
+
+> - It was developed by Intergraph (now part of Hexagon Geospatial) for use in their GIS and CAD/raster systems (e.g., MGE, GeoMedia, and related tooling).
+> - “Type 24” refers to a specific CIT raster encoding/compression variant used within that ecosystem.
+> - The format was designed for internal interoperability within Intergraph software, not as an open standard.
+
+> The format is partially reverse-engineered
 
 
 
