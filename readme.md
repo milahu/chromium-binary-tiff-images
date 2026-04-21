@@ -14,6 +14,7 @@ early draft
 
 - test multi-strip images
 - test too-large images
+- streaming decode (for large TIFFs)
 
 
 

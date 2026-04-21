@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+
+<html>
+
+<head><meta charset="utf-8"></head>
+
+<body>
+
+<!-- this should work -->
+<img title="img/test.group4.tiff" src="img/test.group4.tiff">
+
+<!-- this should fail with: Only 1-bit supported -->
+<img title="img/test.jpeg.tiff" src="img/test.jpeg.tiff">
+
+
+
+<!-- NOTE this breaks on file URLs
+  but decodeTiffToBMP does not work on file URLs anyway
+  https://stackoverflow.com/questions/61052684/how-to-load-a-wasm-module-locally
+-->
+<script src="build-wasm/tiff_wasm.js"></script>
+
+<script type="module">
+
+// FIXME lazy-load the module in replaceTiffImages
+// only when TIFF images were found
+const Module = await create_ccitt_g4_tiff_module();
+
+// const tiff_to_bmp = Module.cwrap(
+//   "tiff_to_bmp",
+//   "number",
+//   ["number", "number", "number", "number"]
+// );
+const tiff_to_bmp = Module._tiff_to_bmp;
+
+// const tiff_free = Module.cwrap("tiff_free", null, ["number"]);
+const tiff_free = Module._tiff_free;
+
+async function decodeTiffToBMP(url) {
+  // WONTFIX this will never work over the file protocol
+  // Access to fetch at 'file:...' from origin 'null' has been blocked by CORS policy
+  const res = await fetch(url);
+  const buf = await res.arrayBuffer();
+
+  const inputPtr = Module._malloc(buf.byteLength);
+  Module.HEAPU8.set(new Uint8Array(buf), inputPtr);
+
+  const outSizePtr = Module._malloc(4);
+
+  const outPtr = tiff_to_bmp(
+    inputPtr,
+    buf.byteLength,
+    outSizePtr,
+    1 // 1-bit BMP
+  );
+
+  if (!outPtr) {
+    // throw new Error("TIFF decode failed");
+    return;
+  }
+
+  const outSize = Module.HEAPU32[outSizePtr >> 2];
+
+  const bmp = Module.HEAPU8.slice(outPtr, outPtr + outSize);
+
+  tiff_free(outPtr);
+  Module._free(inputPtr);
+  Module._free(outSizePtr);
+
+  return bmp;
+}
+
+async function replaceTiffImages() {
+  const images = document.querySelectorAll("img");
+
+  for (const img of images) {
+    if (!img.src.endsWith(".tiff") && !img.src.endsWith(".tif")) continue;
+
+    try {
+      const bmpData = await decodeTiffToBMP(img.src);
+
+      const blob = new Blob([bmpData], { type: "image/bmp" });
+      const url = URL.createObjectURL(blob);
+
+      img.src = url;
+    } catch (e) {
+      // TIFF decode failed: Only 1-bit supported
+      console.error(`TIFF decode failed: ${e.message} @ ${img.src}`);
+    }
+  }
+}
+
+replaceTiffImages();
+
+</script>
+
+</body>
+</html>

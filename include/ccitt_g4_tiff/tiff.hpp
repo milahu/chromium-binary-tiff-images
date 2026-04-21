@@ -439,6 +439,7 @@ public:
             std::vector<uint8_t> strip_out;
             strip_out.reserve(rows * img.width);
 
+            #if false
             // debug
             std::cout
                 << "Decoding strip " << i
@@ -446,6 +447,7 @@ public:
                 << " offset=" << img.strip_offsets[i]
                 << "\n"
             ;
+            #endif
 
             uint32_t done_input_bytes = decode_ccitt_g4(
                 strip.data,

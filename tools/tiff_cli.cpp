@@ -4,7 +4,7 @@
 #include <string>
 
 #include "ccitt_g4_tiff/tiff.hpp"
-#include "bmp_encoder.cpp"
+#include "ccitt_g4_tiff/bmp_encoder.hpp"
 
 static void print_image(const ccitt_g4_tiff::TiffImage& img) {
     std::cout << "TIFF Parsed Successfully\n";

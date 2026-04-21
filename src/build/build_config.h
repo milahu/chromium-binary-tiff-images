@@ -27,15 +27,15 @@
 // ---- COMPILER ----
 #if defined(__clang__)
 #define COMPILER_CLANG 1
-#pragma message "compiler=clang"
-#error pdfium requires GCC. see "No supported trap sequence!" in src/third_party/pdfium/core/fxcrt/immediate_crash.h
+// #pragma message "compiler=clang"
+// #error pdfium requires GCC. see "No supported trap sequence!" in src/third_party/pdfium/core/fxcrt/immediate_crash.h
 #elif defined(__GNUC__)
 #define COMPILER_GCC 1
 // #pragma message "compiler=gcc"
 #elif defined(_MSC_VER)
 #define COMPILER_MSVC 1
-#pragma message "compiler=msvc"
-#error pdfium requires GCC. see "No supported trap sequence!" in src/third_party/pdfium/core/fxcrt/immediate_crash.h
+// #pragma message "compiler=msvc"
+// #error pdfium requires GCC. see "No supported trap sequence!" in src/third_party/pdfium/core/fxcrt/immediate_crash.h
 #endif
 
 // #define _HAS_ITERATOR_DEBUGGING 0

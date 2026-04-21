@@ -13,6 +13,7 @@ with pkgs;
 }) {
   buildInputs = [
     cmake
+    emscripten
 
 /*
     clang-tools
