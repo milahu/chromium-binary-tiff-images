@@ -2,8 +2,8 @@
 
 **User:** Milan Hauth (<milahu@gmail.com>)  
 **Created:** 2026/4/20 18:11:54  
-**Updated:** 2026/4/21 12:39:15  
-**Exported:** 2026/4/21 12:44:28  
+**Updated:** 2026/4/21 14:44:34  
+**Exported:** 2026/4/21 16:06:21  
 **Link:** [<https://chatgpt.com/c/69e6501d-69e0-83eb-bc60-8a47f4cf08b9>](https://chatgpt.com/c/69e6501d-69e0-83eb-bc60-8a47f4cf08b9)
 
 ## Prompt:
@@ -9785,6 +9785,1427 @@ I can help you:
 ### 🧼 or extract ONLY CCITT G4 logic into a clean standalone C++ file
 
 ### 🔧 or integrate JBIG2 later without STL again
+
+Just tell me 👍
+
+## Prompt:
+
+ah! im an idiot.  
+i had wrapped these includes in my tiff_binary namespace:
+
+\#include "third_party/pdfium/core/fxcrt/span.h"  
+\#include "third_party/pdfium/core/fxcodec/fax/faxmodule.h"
+
+error was
+
+\[ 20%\] Building CXX object CMakeFiles/tiff_binary.dir/src/ccitt_g4.cpp.o  
+/nix/store/hh6y3s72d21whp6q98h4dh0valxiaw69-clang-wrapper-21.1.8/bin/clang++ -I/home/user/src/milahu/tiff_binary/include -I/home/user/src/milahu/tiff_binary/src/third_party/pdfium -std=c++20 -MD -MT CMakeFiles/tiff_binary.dir/src/ccitt_g4.cpp.o -MF CMakeFiles/tiff_binary.dir/src/ccitt_g4.cpp.o.d -o CMakeFiles/tiff_binary.dir/src/ccitt_g4.cpp.o -c /home/user/src/milahu/tiff_binary/src/ccitt_g4.cpp  
+In file included from /home/user/src/milahu/tiff_binary/src/ccitt_g4.cpp:9:  
+In file included from /home/user/src/milahu/tiff_binary/src/third_party/pdfium/core/fxcrt/span.h:36:  
+In file included from /nix/store/lvwga6ivl1d4lnw0zis9ajs0rqx9gp4i-gcc-15.2.0/include/c++/15.2.0/functional:61:  
+/nix/store/lvwga6ivl1d4lnw0zis9ajs0rqx9gp4i-gcc-15.2.0/include/c++/15.2.0/bits/std_function.h:56:36: error: unknown class name 'exception'; did you mean '::std::exception'?  
+56 \| class bad_function_call : public std::exception  
+\| ^
+
+the "smoking gun" here is
+
+> did you mean '::std::exception'?
+
+which means that currently the code is wrapped in some namespace, so the std namespace is reachable via ::std
+
+my bad, because i should have shown you more lines of the error message, i posted only the first few lines...
+
+anyway, next error:
+
+FaxG4Decode also expects a "starting_bitpos" parameter, i have set it to zero for now
+
+FaxG4Decode does not accept dest_buf=out.data()
+
+/nix/store/hb2bs5fg5wkm04x565737qd5nh2hy5nk-gcc-wrapper-15.2.0/bin/g++ -I/home/user/src/milahu/tiff_binary/include -I/home/user/src/milahu/tiff_binary/src/third_party/pdfium -std=c++20 -MD -MT CMakeFiles/tiff_binary.dir/src/ccitt_g4.cpp.o -MF CMakeFiles/tiff_binary.dir/src/ccitt_g4.cpp.o.d -o CMakeFiles/tiff_binary.dir/src/ccitt_g4.cpp.o -c /home/user/src/milahu/tiff_binary/src/ccitt_g4.cpp  
+/home/user/src/milahu/tiff_binary/src/ccitt_g4.cpp: In function ‘bool tiff_binary::decode_ccitt_g4(const uint8_t\*, size_t, uint32_t, uint32_t, uint32_t, std::vector<unsigned char>&)’:  
+/home/user/src/milahu/tiff_binary/src/ccitt_g4.cpp:234:15: error: use of deleted function ‘fxcodec::FaxModule::FaxModule()’  
+234 \| FaxModule fax;  
+\| ^\~~  
+In file included from /home/user/src/milahu/tiff_binary/src/ccitt_g4.cpp:8:  
+/home/user/src/milahu/tiff_binary/src/third_party/pdfium/core/fxcodec/fax/faxmodule.h:55:3: note: declared here  
+55 \| FaxModule() = delete;  
+\| ^\~\~\~\~\~\~\~~  
+/home/user/src/milahu/tiff_binary/src/ccitt_g4.cpp:234:15: note: use ‘-fdiagnostics-all-candidates’ to display considered candidates  
+234 \| FaxModule fax;  
+\| ^\~~  
+/home/user/src/milahu/tiff_binary/src/ccitt_g4.cpp:243:17: error: cannot convert ‘unsigned char\*’ to ‘pdfium::span<unsigned char>’  
+243 \| out.data()  
+\| \~\~\~\~\~\~\~~^~  
+\| \|  
+\| unsigned char\*  
+/home/user/src/milahu/tiff_binary/src/third_party/pdfium/core/fxcodec/fax/faxmodule.h:48:53: note: initializing argument 6 of ‘static uint32_t fxcodec::FaxModule::FaxG4Decode(pdfium::span<const unsigned char>, uint32_t, int, int, int, pdfium::span<unsigned char>)’  
+48 \| pdfium::span\<uint8_t\> dest_buf);  
+\| \~\~\~\~\~\~\~\~\~\~\~\~\~\~\~~~~~~~~^~~~~~~~
+
+## Response:
+
+Yep — that earlier namespace issue explains *a lot* of the “mysterious STL failures”. Wrapping third-party headers inside your own namespace is basically guaranteed to break anything that uses `std` internally. Good catch.
+
+Now you’re finally at **real integration errors**, and these are much more straightforward.
+
+------------------------------------------------------------------------
+
+# 🧠 Problem 1: `FaxModule()` is deleted
+
+undefined
+
+This is intentional in PDFium.
+
+### Why?
+
+`FaxModule` is designed as a **static-only utility class**.
+
+------------------------------------------------------------------------
+
+## ✅ Fix
+
+Don’t instantiate it. Call the static method directly:
+
+undefined
+
+------------------------------------------------------------------------
+
+# 🧠 Problem 2: `pdfium::span` mismatch
+
+undefined
+
+PDFium uses its own `pdfium::span` type (similar to `std::span`).
+
+------------------------------------------------------------------------
+
+## ✅ Fix
+
+Wrap your buffer like this:
+
+undefined
+
+and for input:
+
+undefined
+
+------------------------------------------------------------------------
+
+# 🧩 Corrected call
+
+Putting it together:
+
+undefined
+
+------------------------------------------------------------------------
+
+# 🧠 Important detail: `pitch`
+
+This one matters a lot:
+
+undefined
+
+Because CCITT G4 output is **1 bit per pixel**, packed into bytes.
+
+------------------------------------------------------------------------
+
+# 🧠 Return value meaning
+
+`FaxG4Decode` returns:
+
+undefined
+
+So you should validate:
+
+undefined
+
+------------------------------------------------------------------------
+
+# ⚠️ Subtle gotcha (very likely coming next)
+
+TIFF + CCITT G4 may have:
+
+### FillOrder
+
+- MSB-to-LSB (default)
+- LSB-to-MSB (rare but exists)
+
+PDFium assumes **MSB-first**.
+
+If your TIFF says:
+
+undefined
+
+→ you’re fine
+
+If not → you must bit-reverse each byte before decoding.
+
+------------------------------------------------------------------------
+
+# 🧠 Another subtle gotcha: rows_per_strip
+
+You are passing:
+
+undefined
+
+But for multi-strip TIFFs, you must decode per strip:
+
+undefined
+
+PDFium expects the *actual rows being decoded*, not full image height every time.
+
+------------------------------------------------------------------------
+
+# 🧭 Minimal working version (clean)
+
+undefined
+
+------------------------------------------------------------------------
+
+# 🧠 Where you are now (important)
+
+You’ve successfully crossed:
+
+- ❌ STL/toolchain chaos
+- ❌ namespace pollution
+- ❌ PDFium build issues
+
+You are now in:
+
+> ✅ actual image decoding integration phase
+
+------------------------------------------------------------------------
+
+# 🚀 Next likely issues (so you’re prepared)
+
+You’ll probably hit:
+
+1.  **bitstream alignment issues**  
+    → wrong `starting_bitpos`
+2.  **strip stitching errors**  
+    → broken multi-strip handling
+3.  **wrong output orientation**  
+    → TIFF PhotometricInterpretation
+4.  **EOF / invalid run errors**  
+    → mismatched decoder expectations
+
+------------------------------------------------------------------------
+
+# 💬 Bottom line
+
+You don’t need to rewrite PDFium or fight STL anymore.
+
+You just needed to:
+
+- stop instantiating `FaxModule`
+- pass `pdfium::span`
+- respect pitch and bit packing
+
+------------------------------------------------------------------------
+
+If you want, next step I can help you:
+
+👉 wire this cleanly into your multi-strip TIFF pipeline  
+👉 or debug the next “invalid run” / decoding mismatch (very likely coming)
+
+## Prompt:
+
+ok, now i get this link error
+
+tiff_cli.cpp:(.text.\_ZN11tiff_binary10TiffParser5parseEPKhm\[\_ZN11tiff_binary10TiffParser5parseEPKhm\]+0x7a7): undefined reference to tiff_binary::decode_ccitt_g4(unsigned char const\*, unsigned long, unsigned int, unsigned int, std::vector\<unsigned char, std::allocator<unsigned char> \>&)'
+
+## Response:
+
+Nice — this is finally a *normal* C++ linker error, not toolchain madness 🙂
+
+------------------------------------------------------------------------
+
+# 🧠 What the error actually means
+
+undefined
+
+This means:
+
+> ❗ The compiler saw the **declaration**, but the linker cannot find the **definition**
+
+So one of these is true:
+
+------------------------------------------------------------------------
+
+# 🔍 Most likely causes (in your setup)
+
+## 1. Function is declared but not defined (or signature mismatch)
+
+Check that you have **exactly the same signature**:
+
+### Header (or forward declaration)
+
+undefined
+
+### Implementation
+
+undefined
+
+------------------------------------------------------------------------
+
+### ⚠️ Common mistake
+
+undefined
+
+→ linker looks for `tiff_binary::decode_ccitt_g4` but finds global version
+
+------------------------------------------------------------------------
+
+## 2. Source file not added to CMake
+
+You probably have:
+
+undefined
+
+but it’s NOT in your target.
+
+------------------------------------------------------------------------
+
+## ✅ Fix in `CMakeLists.txt`
+
+Make sure:
+
+undefined
+
+or if using executable:
+
+undefined
+
+------------------------------------------------------------------------
+
+## 3. Header-only confusion
+
+If you *declared* it in a header but implemented in `.cpp`:
+
+→ you must link that `.cpp`
+
+If you want header-only:
+
+undefined
+
+(but not recommended here)
+
+------------------------------------------------------------------------
+
+## 4. Signature mismatch (very sneaky)
+
+Your error shows:
+
+undefined
+
+If your implementation uses:
+
+undefined
+
+or:
+
+undefined
+
+→ those are **different symbols**
+
+------------------------------------------------------------------------
+
+## ✅ Safe version (match exactly)
+
+Use:
+
+undefined
+
+everywhere
+
+------------------------------------------------------------------------
+
+# 🧪 Quick diagnostic
+
+Run:
+
+undefined
+
+or for object file:
+
+undefined
+
+If nothing shows → not compiled  
+If symbol exists but name differs → signature mismatch
+
+------------------------------------------------------------------------
+
+# 🧠 Why this appeared *now*
+
+Because:
+
+- you fixed compilation ✔
+- now linker is the next stage ✔
+
+This is actually progress.
+
+------------------------------------------------------------------------
+
+# 💬 Most likely fix in your case
+
+Given your workflow, I’d bet:
+
+> ❗ `src/ccitt_g4.cpp` is not added to your CMake target
+
+------------------------------------------------------------------------
+
+# 🚀 Minimal working CMake snippet
+
+undefined
+
+------------------------------------------------------------------------
+
+# 🧭 Where you are now
+
+You’re finally past:
+
+- ❌ toolchain hell
+- ❌ STL chaos
+- ❌ PDFium integration errors
+
+You’re in:
+
+> ✅ normal C++ build/debug cycle
+
+------------------------------------------------------------------------
+
+# If you want next step
+
+Next useful things I can help you with:
+
+- 🧩 multi-strip decode integration (correct row stitching)
+- 🧠 handling TIFF FillOrder + PhotometricInterpretation correctly
+- 🔍 debugging *actual* CCITT decode errors (you will hit those next)
+
+Just say 👍
+
+## Prompt:
+
+ok, now i get many link errors for pdfium functions...  
+at this point, i guess it would be simpler to link my tiff_binary parser against a full build of the pdfium library, since the pdfium library is already part of chromium...  
+or does pdfium not expose the functions i need?  
+if pdfium does not expose these functions, can i use them anyway...?
+
+## Response:
+
+You’re not wrong to think “just link PDFium,” but this is one of those cases where that instinct leads straight back into complexity.
+
+Short answer:
+
+> ❗ You *can* use PDFium, but not the way you’re trying right now  
+> ❗ The CCITT/JBIG2 decoders are **NOT part of the public API**  
+> ❗ Linking “just the fax module” is exactly why you’re drowning in linker errors
+
+Let’s break it down clearly.
+
+------------------------------------------------------------------------
+
+# 🧠 How PDFium is structured
+
+PDFium has two layers:
+
+## 1. Public API (stable, exposed)
+
+undefined
+
+These are:
+
+- C-style
+- stable
+- intended for embedding
+
+👉 **No raw CCITT or JBIG2 decode functions here**
+
+------------------------------------------------------------------------
+
+## 2. Internal codec layer (what you're using)
+
+undefined
+
+These are:
+
+- private
+- not ABI-stable
+- tightly coupled to the rest of PDFium
+- depend on fxcrt, memory system, allocators, etc.
+
+👉 `FaxModule::FaxG4Decode` lives here
+
+------------------------------------------------------------------------
+
+# 💥 Why you’re getting linker errors
+
+Because `faxmodule.cpp` depends on:
+
+- fxcrt (memory, span, checks)
+- numeric helpers
+- debug/assert system
+- sometimes even global state
+
+So when you include just:
+
+undefined
+
+you implicitly require:
+
+undefined
+
+------------------------------------------------------------------------
+
+# 🚨 Important conclusion
+
+> ❗ PDFium is NOT designed to be used as a “codec library”
+
+It is:
+
+> a **PDF rendering engine with embedded codecs**
+
+------------------------------------------------------------------------
+
+# 🧭 Your options (realistically)
+
+------------------------------------------------------------------------
+
+## 🥇 Option A — Build and link full PDFium (heavy but clean)
+
+Yes, you can:
+
+- build full PDFium (like Chromium does)
+- link against it
+- call internal symbols (if you expose them)
+
+### BUT:
+
+- build system is GN (not CMake)
+- very large dependency tree
+- not trivial outside Chromium
+- no stable API for your use case
+
+👉 You’d basically embed a PDF engine just to decode TIFF
+
+------------------------------------------------------------------------
+
+## 🥈 Option B — Copy + trim decoder (what you started)
+
+This is actually the **correct engineering approach** for your goal.
+
+But:
+
+> ❗ You must go further than just copying `faxmodule.cpp`
+
+You need to:
+
+- isolate the CCITT decoder core
+- remove PDFium infrastructure
+- replace:
+  - `pdfium::span`
+  - memory helpers
+  - debug macros
+
+👉 turn it into a **standalone decoder**
+
+------------------------------------------------------------------------
+
+## 🥉 Option C — Use another CCITT G4 decoder (honestly easiest)
+
+This is worth saying bluntly:
+
+> ❗ CCITT G4 is *not* a rare or proprietary format
+
+You can use:
+
+- a minimal decoder from:
+  - Ghostscript
+  - MuPDF (cleaner than PDFium)
+  - or small standalone implementations
+
+👉 Much less friction than PDFium
+
+------------------------------------------------------------------------
+
+# 🧠 What about JBIG2?
+
+This is where things get interesting:
+
+- JBIG2 **is complex and dangerous** (historically many exploits)
+- PDFium’s JBIG2 decoder is:
+  - large
+  - security-hardened
+  - deeply integrated
+
+👉 Extracting it cleanly is **much harder than CCITT**
+
+------------------------------------------------------------------------
+
+# 💬 Direct answers to your questions
+
+## \> does pdfium expose the functions i need?
+
+❌ No
+
+- no public API for CCITT/JBIG2 decode
+- only internal functions like `FaxG4Decode`
+
+------------------------------------------------------------------------
+
+## \> can i use them anyway?
+
+✔ Yes, but only if you:
+
+- build full PDFium
+- or extract and adapt the code
+
+NOT by linking a few `.cpp` files
+
+------------------------------------------------------------------------
+
+# 🧠 Recommendation (based on your project)
+
+You said:
+
+> minimal TIFF parser  
+> CCITT G4 now  
+> JBIG2 later  
+> Chromium integration eventually
+
+------------------------------------------------------------------------
+
+## 👉 Best path forward
+
+### For CCITT G4:
+
+✔ **Do NOT use PDFium directly**  
+✔ Extract or use a minimal decoder (MuPDF-style)
+
+------------------------------------------------------------------------
+
+### For JBIG2:
+
+✔ Revisit later  
+✔ Possibly reuse PDFium *or* a dedicated decoder
+
+------------------------------------------------------------------------
+
+# 🚀 Practical next step
+
+Given where you are now:
+
+> 🔥 STOP trying to link PDFium pieces
+
+Instead:
+
+## Option 1 (fastest)
+
+I can give you:
+
+👉 a **clean standalone CCITT G4 decoder (no STL, no PDFium deps)**
+
+------------------------------------------------------------------------
+
+## Option 2 (closer to your current work)
+
+I help you:
+
+👉 strip PDFium fax module down to:
+
+- ~1–2 files
+- no fxcrt
+- no STL
+- no linker chaos
+
+------------------------------------------------------------------------
+
+# 💬 Bottom line
+
+You’ve reached the key realization:
+
+> ❗ PDFium is not a codec library you can partially link
+
+So either:
+
+- go **all-in (full PDFium)**
+- or go **minimal (extract decoder)**
+
+Mixing both is what caused all your pain so far.
+
+------------------------------------------------------------------------
+
+# If you want
+
+I’d strongly recommend:
+
+👉 “Give me a minimal CCITT G4 decoder (clean, standalone, no dependencies)”
+
+That will unblock you immediately.
+
+## Prompt:
+
+> you implicitly require:  
+> ~20–50 additional translation units
+
+no, it was simpler than expected
+
+CMakeLists.txt
+
+add_library(tiff_binary  
+\# src/third_party/pdfium/core/fxcrt/fx_memory_pa.cpp  
+src/third_party/pdfium/core/fxcrt/fx_memory_malloc.cpp
+
+    src/third_party/pdfium/core/fxcrt/fx_memory.h
+    src/third_party/pdfium/core/fxcrt/fx_memory.cpp
+
+    src/third_party/pdfium/core/fxcrt/debug/alias.h
+    src/third_party/pdfium/core/fxcrt/debug/alias.cc
+
+    src/third_party/pdfium/core/fxge/calculate_pitch.h
+    src/third_party/pdfium/core/fxge/calculate_pitch.cpp
+
+    src/third_party/pdfium/core/fxcodec/scanlinedecoder.h
+    src/third_party/pdfium/core/fxcodec/scanlinedecoder.cpp
+
+    src/third_party/pdfium/core/fxcodec/fax/faxmodule.cpp
+
+    src/ccitt_g4.cpp
+
+)
+
+now the build works  
+but it fails on runtime
+
+\$ ./build/tiff_cli test.tiff  
+Decoding strip 0 rows=604 offset=8  
+Decoded strip 0 written=15802  
+TIFF parse error: Final image size mismatch
+
+## Response:
+
+Nice — that’s actually a big milestone. You’ve proven you can embed the PDFium fax path with a *minimal* subset. That’s non-trivial.
+
+Now the runtime error:
+
+undefined
+
+This is no longer a build/integration problem — it’s a **semantic mismatch between TIFF expectations and PDFium’s decoder output**.
+
+------------------------------------------------------------------------
+
+# 🧠 First sanity check (numbers don’t lie)
+
+From your earlier data:
+
+- width = 604
+- height = 604
+- bits per pixel = 1
+
+So expected output size:
+
+undefined
+
+But you got:
+
+undefined
+
+👉 That’s **way too small (~1/3 of expected)**
+
+------------------------------------------------------------------------
+
+# 💥 What this means
+
+> ❗ The decoder did NOT produce a full image
+
+Not a small bug — this is structural:
+
+- either wrong parameters
+- or decoder stopped early
+- or input stream misinterpreted
+
+------------------------------------------------------------------------
+
+# 🧠 Most likely causes (ranked)
+
+------------------------------------------------------------------------
+
+## 🥇 1. WRONG PARAMETER ORDER (very likely)
+
+PDFium’s signature is:
+
+undefined
+
+### Common mistake:
+
+Mixing up `height` and `pitch`
+
+------------------------------------------------------------------------
+
+## 🥇 Verify this EXACT call:
+
+undefined
+
+------------------------------------------------------------------------
+
+## 🥈 2. WRONG `height` per strip
+
+You printed:
+
+undefined
+
+That looks fine — BUT:
+
+TIFF logic must be:
+
+undefined
+
+If you always pass full `height`, decoder may:
+
+- stop early
+- or mis-handle EOL markers
+
+------------------------------------------------------------------------
+
+## 🥉 3. `starting_bitpos` is not always 0
+
+You said:
+
+> set it to zero for now
+
+That’s usually fine, BUT:
+
+If your strip offset is not byte-aligned:
+
+undefined
+
+→ bitpos = 0 is correct
+
+So probably not the issue *here*
+
+------------------------------------------------------------------------
+
+## 🥉 4. TIFF FillOrder mismatch
+
+From your earlier `tiffinfo`:
+
+undefined
+
+PDFium expects MSB-first → ✔ correct
+
+So not the issue.
+
+------------------------------------------------------------------------
+
+## 🥉 5. Decoder stops early (EOF handling)
+
+This is VERY common with CCITT:
+
+PDFium stops when:
+
+- it thinks it reached EOL
+- or sees end-of-data marker
+- or runs out of valid codes
+
+👉 That gives partial output like yours
+
+------------------------------------------------------------------------
+
+# 🔍 Key insight from your number
+
+undefined
+
+👉 Decoder produced ~208 rows out of 604
+
+This strongly suggests:
+
+> ❗ decoder thinks image height ≈ 208 rows
+
+------------------------------------------------------------------------
+
+# 💥 That points to ONE thing
+
+## 👉 Wrong height passed to decoder
+
+Double-check:
+
+- Are you passing **image height**?
+- Or **rows_per_strip**?
+- Or something else?
+
+------------------------------------------------------------------------
+
+# 🧠 Correct logic (important)
+
+For each strip:
+
+undefined
+
+------------------------------------------------------------------------
+
+# 🚨 BIG gotcha: output buffer
+
+Right now you likely do:
+
+undefined
+
+But for multi-strip:
+
+👉 You must offset output per strip:
+
+undefined
+
+------------------------------------------------------------------------
+
+# 🧩 Correct multi-strip pattern
+
+undefined
+
+------------------------------------------------------------------------
+
+# 🧠 Why your current result happens
+
+You probably:
+
+- pass full height (604)
+- but decoder only finds ~208 rows worth of data
+- stops early
+- returns partial buffer
+
+------------------------------------------------------------------------
+
+# 🧪 Debug this quickly
+
+Print:
+
+undefined
+
+and also:
+
+undefined
+
+------------------------------------------------------------------------
+
+# 💬 Bottom line
+
+You are extremely close.
+
+This is almost certainly:
+
+> ❗ mismatch between strip row count and decoder height parameter
+
+------------------------------------------------------------------------
+
+# 🚀 If you want next step
+
+I can help you:
+
+- 🔍 verify your TIFF strip logic line-by-line
+- 🧠 add strict validation (catch early termination properly)
+- 🧩 build a robust CCITT pipeline (Chromium-grade correctness)
+
+Just say 👍
+
+## Prompt:
+
+with more debug outputs
+
+\$ ./build/tiff_cli test.tiff  
+Decoding strip 0 rows=604 offset=8  
+img.width: 604  
+img.height: 604  
+rows_per_strip: 604  
+expected bytes: 45904  
+written bytes: 15802  
+decoded rows: 207  
+TIFF parse error: Final image size mismatch
+
+\$ identify test.tiff  
+test.tiff TIFF 604x604 604x604+0+0 1-bit Bilevel Gray 2242B 0.000u 0:00.000
+
+next, tiff_cli should have a output parameter "-o output_file"  
+so i can write the decoded pixels to an image file  
+for visual inspection of the decoded pixels...  
+what is the simplest image format for this?
+
+## Response:
+
+Good idea — visual inspection will save you *a lot* of time here.
+
+Given your data:
+
+- 1-bit pixels
+- already packed (1 bit per pixel, MSB-first)
+- grayscale (min-is-black)
+
+you want something:
+
+- trivial to write
+- no dependencies
+- tolerant of raw buffers
+
+------------------------------------------------------------------------
+
+# 🥇 Best choice: **PGM (Portable Graymap)**
+
+Portable Graymap
+
+### Why?
+
+- dead simple format
+- human-readable header
+- no libraries needed
+- widely supported (ImageMagick, etc.)
+- perfect for debugging
+
+------------------------------------------------------------------------
+
+# 🧠 Two variants exist
+
+## 1. ASCII (P2) → easy but slow
+
+## 2. Binary (P5) → what you want
+
+------------------------------------------------------------------------
+
+# 🧩 PGM (P5) format
+
+Header:
+
+undefined
+
+Then raw bytes:
+
+- 1 byte per pixel (0–255)
+
+------------------------------------------------------------------------
+
+# ⚠️ Important: your data is 1-bit
+
+You must expand:
+
+undefined
+
+------------------------------------------------------------------------
+
+# 🧩 Minimal conversion
+
+undefined
+
+------------------------------------------------------------------------
+
+# 🧠 Why `bit ? 0 : 255`
+
+From your TIFF:
+
+undefined
+
+So:
+
+| bit | meaning | output |
+|-----|---------|--------|
+| 1   | black   | 0      |
+| 0   | white   | 255    |
+
+------------------------------------------------------------------------
+
+# 🧪 CLI usage idea
+
+undefined
+
+Then:
+
+undefined
+
+------------------------------------------------------------------------
+
+# 🥈 Alternative: PBM (even simpler)
+
+Portable Bitmap
+
+This supports 1-bit directly.
+
+BUT:
+
+- slightly more annoying bit packing rules
+- less convenient for debugging grayscale issues
+
+------------------------------------------------------------------------
+
+# 🧠 Why PGM is better for debugging
+
+Because you can:
+
+- easily inspect gradients / corruption
+- see partial decoding clearly
+- avoid bit-order confusion
+
+------------------------------------------------------------------------
+
+# 🧭 What you’ll likely see
+
+Given your current bug:
+
+> decoded rows ≈ 207 instead of 604
+
+Your output image will probably show:
+
+- top ~200 rows correct
+- rest either:
+  - black
+  - white
+  - garbage
+
+👉 That will confirm the “early EOF / wrong row count” hypothesis.
+
+------------------------------------------------------------------------
+
+# 💬 Bottom line
+
+Use **PGM (P5)**:
+
+- simplest
+- most robust
+- perfect for your debugging stage
+
+------------------------------------------------------------------------
+
+# 🚀 If you want next step
+
+Once you generate the image, I can help you:
+
+- 🔍 interpret what the corruption pattern means
+- 🧠 pinpoint exactly why PDFium stops at ~207 rows
+- 🧩 fix your CCITT pipeline to full correctness
+
+Just send what you see 👍
+
+## Prompt:
+
+> void write_pgm(
+
+yes, how can i call this from my main function?  
+the -o parameter should be optional
+
+## Response:
+
+Nice — this is straightforward CLI plumbing. You don’t need anything fancy.
+
+------------------------------------------------------------------------
+
+# 🧠 Goal
+
+You want:
+
+undefined
+
+------------------------------------------------------------------------
+
+# 🧩 Minimal argument parsing
+
+Keep it simple:
+
+undefined
+
+------------------------------------------------------------------------
+
+# 🧠 After parsing + decoding
+
+Assuming you already have:
+
+undefined
+
+Just add:
+
+undefined
+
+------------------------------------------------------------------------
+
+# 🧩 Full minimal structure
+
+undefined
+
+------------------------------------------------------------------------
+
+# 🧠 Small usability tip
+
+You can also support:
+
+undefined
+
+and auto-append `.pgm` if missing:
+
+undefined
+
+------------------------------------------------------------------------
+
+# 🧪 After this
+
+Run:
+
+undefined
+
+Then view:
+
+undefined
+
+or:
+
+undefined
+
+------------------------------------------------------------------------
+
+# 🚀 What comes next
+
+Once you see the image, it will *immediately* tell us:
+
+- partial decode (top correct, bottom blank) → row count bug
+- skewed / diagonal artifacts → bitstream issue
+- inverted colors → photometric issue
+
+That’s the fastest way to debug your remaining CCITT issue.
+
+------------------------------------------------------------------------
+
+If you want, next step I can help you interpret the output image 👍
+
+## Prompt:
+
+ok, the TIFF and PGM images are visually identical, so parsing and decoding works : )
+
+so we have to fix our assumptions about the sizes...
+
+## \$ ./build/tiff_cli test.tiff -o test.pgm Decoding strip 0 rows=604 offset=8 img.width: 604 img.height: 604 rows_per_strip: 604 expected bytes: pitch \* rows_per_strip: 45904 written bytes: 15802 decoded rows: written / pitch: 207 Final image size mismatch: 45904 != 364816 TIFF Parsed Successfully
+
+Width: 604  
+Height: 604  
+Compression: CCITT_GROUP4  
+BitsPerSample: 1  
+SamplesPerPixel: 1  
+Strips: 1  
+Strip 0: offset=8, size=1979  
+Wrote output to test.pgm
+
+## Response:
+
+That result is actually *excellent news* — it tells us the decoder is working correctly and your mental model (not the code) needs adjustment.
+
+Let’s walk through what’s really happening.
+
+------------------------------------------------------------------------
+
+# 🧠 The key contradiction
+
+You printed:
+
+undefined
+
+BUT:
+
+> the image is visually identical ✅
+
+That means:
+
+> ❗ Your “expected bytes” calculation is wrong for this decoder path
+
+—not the decoder.
+
+------------------------------------------------------------------------
+
+# 💥 The real behavior of PDFium’s FaxG4Decode
+
+This is the critical insight:
+
+> ❗ `FaxG4Decode()` does **NOT return “bytes written” in the way you think**
+
+It returns:
+
+undefined
+
+—not:
+
+undefined
+
+------------------------------------------------------------------------
+
+# 🧠 That explains EVERYTHING
+
+Your numbers:
+
+undefined
+
+👉 Notice:
+
+undefined
+
+That’s **bits → bytes confusion**
+
+------------------------------------------------------------------------
+
+# 🔍 What’s actually happening
+
+- Input strip size: 1979 bytes
+- CCITT G4 is bit-level compression
+- Decoder processes bits, not bytes
+
+So:
+
+undefined
+
+NOT image output size.
+
+------------------------------------------------------------------------
+
+# 🧠 Why your image still looks correct
+
+Because:
+
+undefined
+
+You already gave it the FULL output buffer.
+
+👉 The decoder filled it correctly.
+
+You just misinterpreted the return value.
+
+------------------------------------------------------------------------
+
+# 💥 This line is wrong
+
+undefined
+
+Because:
+
+> ❗ `written` is NOT output size
+
+------------------------------------------------------------------------
+
+# 🧠 Correct mental model
+
+| Thing          | Meaning                       |
+|----------------|-------------------------------|
+| `dest`         | full output buffer            |
+| decoder writes | directly into buffer          |
+| return value   | input consumption, not output |
+
+------------------------------------------------------------------------
+
+# ✅ What you should do instead
+
+## 1. REMOVE this check entirely
+
+undefined
+
+------------------------------------------------------------------------
+
+## 2. Trust your buffer size
+
+You already did:
+
+undefined
+
+That’s the correct size.
+
+------------------------------------------------------------------------
+
+## 3. Optional sanity check
+
+If you want *some* validation:
+
+undefined
+
+That’s it.
+
+------------------------------------------------------------------------
+
+# 🧠 Why PDFium does this
+
+Because it’s designed for streaming decode:
+
+- input → bitstream
+- output → scanlines
+- return value → how much input was consumed
+
+Not:
+
+> “I’ll tell you how big the image is”
+
+------------------------------------------------------------------------
+
+# 🧭 Final fix in your code
+
+Replace:
+
+undefined
+
+with:
+
+undefined
+
+And remove:
+
+undefined
+
+------------------------------------------------------------------------
+
+# 🧠 Big takeaway (important)
+
+You just hit a classic trap:
+
+> ❗ confusing “decoder return value” with “output size”
+
+------------------------------------------------------------------------
+
+# 🚀 Where you are now
+
+You have:
+
+✔ working TIFF parser  
+✔ working CCITT G4 decode  
+✔ correct image output  
+✔ multi-strip ready  
+✔ CLI debug tool
+
+That’s basically a full minimal pipeline.
+
+------------------------------------------------------------------------
+
+# 💬 Next logical steps
+
+Now you can:
+
+## 1. Clean API
+
+undefined
+
+------------------------------------------------------------------------
+
+## 2. Add robustness
+
+- validate TIFF tags strictly
+- handle multiple strips
+- handle fill order (future)
+
+------------------------------------------------------------------------
+
+## 3. Prepare for JBIG2
+
+You now have the exact same pipeline shape needed.
+
+------------------------------------------------------------------------
+
+# 🎯 Bottom line
+
+Nothing is broken.
+
+> ❗ The decoder was correct the whole time — only your interpretation of `written` was wrong.
+
+------------------------------------------------------------------------
+
+If you want, next I can help you:
+
+- 🧩 integrate multi-strip stitching cleanly
+- 🧠 add support for inverted photometric images
+- 🔥 or prepare the architecture for JBIG2 (which is a bigger beast)
 
 Just tell me 👍
 
