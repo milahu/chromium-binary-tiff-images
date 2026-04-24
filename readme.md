@@ -49,10 +49,20 @@ but implemented in HTML
 
 ## limitations
 
+
+
+### no file protocol
+
 the polyfill does not work over the file protocol,
 because we cannot
 [fetch](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch)
 the Group4 image
+
+
+
+### requires javascript
+
+the polyfill requires JavaScript ans WebAssembly (WASM)
 
 
 
