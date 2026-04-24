@@ -24,23 +24,23 @@ ls img/*.group4.tiff | sed 's|.*|<img title="\0" src="\0">|'
   but decodeTiffToBMP does not work on file URLs anyway
   https://stackoverflow.com/questions/61052684/how-to-load-a-wasm-module-locally
 -->
-<script src="build-wasm/tiff_wasm.js"></script>
+<script src="build-wasm/group4-polyfill.js"></script>
 
 <script type="module">
 
 // FIXME lazy-load the module in replaceTiffImages
 // only when TIFF images were found
-const Module = await create_ccitt_g4_tiff_module();
+const group4_polyfill = await create_group4_polyfill_module();
 
-// const tiff_to_bmp = Module.cwrap(
+// const tiff_to_bmp = group4_polyfill.cwrap(
 //   "tiff_to_bmp",
 //   "number",
 //   ["number", "number", "number", "number"]
 // );
-const tiff_to_bmp = Module._tiff_to_bmp;
+const tiff_to_bmp = group4_polyfill._tiff_to_bmp;
 
-// const tiff_free = Module.cwrap("tiff_free", null, ["number"]);
-const tiff_free = Module._tiff_free;
+// const tiff_free = group4_polyfill.cwrap("tiff_free", null, ["number"]);
+const tiff_free = group4_polyfill._tiff_free;
 
 async function decodeTiffToBMP(url) {
   // WONTFIX this will never work over the file protocol
@@ -48,10 +48,10 @@ async function decodeTiffToBMP(url) {
   const res = await fetch(url);
   const buf = await res.arrayBuffer();
 
-  const inputPtr = Module._malloc(buf.byteLength);
-  Module.HEAPU8.set(new Uint8Array(buf), inputPtr);
+  const inputPtr = group4_polyfill._malloc(buf.byteLength);
+  group4_polyfill.HEAPU8.set(new Uint8Array(buf), inputPtr);
 
-  const outSizePtr = Module._malloc(4);
+  const outSizePtr = group4_polyfill._malloc(4);
 
   const outPtr = tiff_to_bmp(
     inputPtr,
@@ -65,13 +65,13 @@ async function decodeTiffToBMP(url) {
     return;
   }
 
-  const outSize = Module.HEAPU32[outSizePtr >> 2];
+  const outSize = group4_polyfill.HEAPU32[outSizePtr >> 2];
 
-  const bmp = Module.HEAPU8.slice(outPtr, outPtr + outSize);
+  const bmp = group4_polyfill.HEAPU8.slice(outPtr, outPtr + outSize);
 
   tiff_free(outPtr);
-  Module._free(inputPtr);
-  Module._free(outSizePtr);
+  group4_polyfill._free(inputPtr);
+  group4_polyfill._free(outSizePtr);
 
   return bmp;
 }

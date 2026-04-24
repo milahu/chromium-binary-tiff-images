@@ -1,12 +1,12 @@
-# ccitt_g4_tiff
+# group4-polyfill
 
-minimal decoder for Group4-compressed TIFF images for Chromium
+decode [Group4](https://en.wikipedia.org/wiki/Group_4_compression) images in a web browser
 
 
 
 ## status
 
-early draft
+working prototype
 
 
 
@@ -44,6 +44,15 @@ are useful for [EPUB-FXL documents](https://github.com/internetarchive/archive-h
 (FXL = fixed layout)  
 which are similar to PDF documents of scanned book pages  
 but implemented in HTML
+
+
+
+## limitations
+
+the polyfill does not work over the file protocol,
+because we cannot
+[fetch](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch)
+the Group4 image
 
 
 
@@ -231,3 +240,10 @@ so we need a container format like TIFF (or PDF)
 https://github.com/ArtifexSoftware/jbig2dec
 
 https://cgit.freedesktop.org/poppler/poppler/tree/poppler/JBIG2Stream.cc
+
+
+
+## similar projects
+
+- https://github.com/photopea/UTIF.js
+- https://github.com/milahu/jbig2-polyfill

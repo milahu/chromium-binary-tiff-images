@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(ccitt_g4_tiff CXX)
+project(group4-polyfill CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -48,22 +48,22 @@ target_compile_options(ccitt_g4_tiff PRIVATE
 
 if(EMSCRIPTEN)
 
-    add_executable(tiff_wasm
+    add_executable(group4-polyfill
         tools/bmp_encoder.cpp
         tools/tiff_to_bmp.cpp
     )
 
-    target_link_libraries(tiff_wasm PRIVATE
+    target_link_libraries(group4-polyfill PRIVATE
         ccitt_g4_tiff
     )
 
     # see also
     # https://github.com/paulocoutinhox/pdfium-lib/blob/master/modules/wasm.py
 
-    target_link_options(tiff_wasm PRIVATE
+    target_link_options(group4-polyfill PRIVATE
         "-sWASM=1"
         "-sMODULARIZE=1"
-        "-sEXPORT_NAME=create_ccitt_g4_tiff_module"
+        "-sEXPORT_NAME=create_group4_polyfill_module"
         "-sALLOW_MEMORY_GROWTH=1"
         "-sEXPORTED_FUNCTIONS=['_tiff_to_bmp','_tiff_free','_malloc','_free']"
         "-sEXPORTED_RUNTIME_METHODS=['cwrap','HEAPU8','HEAPU32']"
@@ -77,13 +77,13 @@ if(EMSCRIPTEN)
 
 else()
 
-    add_executable(tiff_cli
+    add_executable(group4_to_bmp
         tools/tiff_cli.cpp
         tools/bmp_encoder.cpp
         tools/tiff_to_bmp.cpp
     )
 
-    target_link_libraries(tiff_cli PRIVATE
+    target_link_libraries(group4_to_bmp PRIVATE
         ccitt_g4_tiff
     )
 
