@@ -37,8 +37,8 @@ with single-bit depth (bitonal images)
 and high resolution (usually 600 dpi)
 
 the only usable alternative is the AVIF image format  
-but compressing AVIF images  
-takes about 5000 times more CPU time  
+but compressing JPEG images to AVIF images  
+takes about 1000 times more CPU time  
 than compressing CCITT-G4 images  
 to get similar file size and similar visual quality
 
